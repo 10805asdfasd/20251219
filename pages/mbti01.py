@@ -193,12 +193,12 @@ with tab2:
         st.info(f"📌 **{korea_name}**의 **{target_mbti}** 지수는 **{sorted_df.loc[sorted_df['Country'] == korea_name, target_mbti].values[0]}**이며, 전체 **{real_rank}위**입니다.")
 
 # === Tab 3: 국가별 최다 MBTI 분류 (신규 기능) ===
+# === Tab 3: 국가별 최다 MBTI 분류 ===
 with tab3:
     st.subheader("🗺️ 국가별 대표(최다) MBTI 유형 분류")
     st.markdown("각 국가별로 점수가 가장 높은 MBTI 유형을 찾아 분류했습니다.")
     
     # 1. 각 행(국가)별로 최대 값을 가진 컬럼(MBTI) 찾기
-    # idxmax(axis=1)은 각 행에서 최대값을 가진 열의 이름을 반환합니다.
     df_class = df.copy()
     df_class['Dominant_MBTI'] = df_class[mbti_cols].idxmax(axis=1)
     
@@ -206,21 +206,21 @@ with tab3:
     df_class['Country_KR'] = df_class['Country'].apply(translate_country)
     
     # 3. MBTI별로 그룹화하여 국가 리스트 만들기
-    # reset_index를 통해 데이터프레임 형태로 변환
-    grouped_df = df_class.groupby('Dominant_MBTI')['Country_KR'].apply(list).reset_index()
+    # [수정됨] lambda x: sorted(list(x)) -> 국가 목록을 가나다 순으로 정렬
+    grouped_df = df_class.groupby('Dominant_MBTI')['Country_KR'].apply(lambda x: sorted(list(x))).reset_index()
     
-    # 4. 리스트를 보기 좋게 문자열로 변환 (예: "한국, 미국, 일본")
+    # 4. 리스트를 보기 좋게 문자열로 변환 (예: "대한민국, 미국, 일본...")
     grouped_df['Countries'] = grouped_df['Country_KR'].apply(lambda x: ', '.join(x))
     grouped_df['Count'] = grouped_df['Country_KR'].apply(len) # 해당 유형인 국가 수
     
-    # 5. 국가 수가 많은 MBTI 순서대로 정렬
+    # 5. 국가 수가 많은 MBTI 순서대로 행 정렬
     grouped_df = grouped_df.sort_values(by='Count', ascending=False)
     
     # 6. 최종 표시용 데이터프레임
     display_df = grouped_df[['Dominant_MBTI', 'Count', 'Countries']]
     display_df.columns = ['최다 MBTI 유형', '국가 수', '해당 국가 목록']
     
-# 7. 스타일링하여 표 출력
+    # 7. 스타일링하여 표 출력
     st.dataframe(
         display_df,
         use_container_width=True,
@@ -228,6 +228,12 @@ with tab3:
         column_config={
             "최다 MBTI 유형": st.column_config.TextColumn("대표 MBTI", width="small"),
             "국가 수": st.column_config.NumberColumn("국가 수", width="small"),
-            "해당 국가 목록": st.column_config.TextColumn("국가 목록 (한글)", width="large"),
+            "해당 국가 목록": st.column_config.TextColumn("국가 목록 (가나다 순)", width="large"),
         }
     )
+    
+    # 요약 정보
+    if not grouped_df.empty:
+        top_mbti = grouped_df.iloc[0]['Dominant_MBTI']
+        top_count = grouped_df.iloc[0]['Count']
+        st.success(f"총 {len(df)}개 국가 중 **{top_mbti}** 성향이 1위인 국가가 {top_count}개로 가장 많습니다.")
