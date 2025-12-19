@@ -179,11 +179,14 @@ with tab3:
     display_df = grouped_df[['Dominant_MBTI', 'Count', 'Countries']]
     display_df.columns = ['최다 MBTI 유형', '국가 수', '해당 국가 목록']
     
-    # 7. 스타일링하여 표 출력
+# 7. 스타일링하여 표 출력
     st.dataframe(
         display_df,
         use_container_width=True,
         hide_index=True,
         column_config={
             "최다 MBTI 유형": st.column_config.TextColumn("대표 MBTI", width="small"),
-            "국가 수": st.column_config.NumberColumn("국가 수
+            "국가 수": st.column_config.NumberColumn("국가 수", width="small"),
+            "해당 국가 목록": st.column_config.TextColumn("국가 목록 (한글)", width="large"),
+        }
+    )
