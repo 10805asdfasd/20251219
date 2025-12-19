@@ -10,15 +10,15 @@ st.set_page_config(
 )
 
 # --- 타이틀 ---
-st.title("🌏 국가별 MBTI 성향 분석 (Interactive)")
-st.markdown("Matplotlib 없이 스트림릿 내장 차트 기능을 활용하여 분석합니다.")
+st.title("🌏 국가별 MBTI 성향 분석")
+st.markdown("데이터 파일(`mbti.csv`)을 기반으로 국가별 성향과 순위를 분석합니다.")
 
 # --- 데이터 로드 함수 ---
 @st.cache_data
 def load_data():
     try:
-        # 같은 폴더에 있는 파일 읽기
-        df = pd.read_csv('mbti_data.csv')
+        # 파일 이름 수정: mbti.csv
+        df = pd.read_csv('mbti.csv')
         return df
     except FileNotFoundError:
         return None
@@ -27,8 +27,8 @@ df = load_data()
 
 # --- 데이터 로드 실패 시 안내 ---
 if df is None:
-    st.error("❌ 'mbti_data.csv' 파일을 찾을 수 없습니다.")
-    st.info("같은 폴더에 데이터 파일이 있는지 확인해주세요.")
+    st.error("❌ 'mbti.csv' 파일을 찾을 수 없습니다.")
+    st.info("같은 폴더에 'mbti.csv' 이름의 파일이 있는지 확인해주세요.")
     st.stop()
 
 # --- 사이드바: 옵션 설정 ---
@@ -37,6 +37,7 @@ with st.sidebar:
     
     # 한국의 영문 표기 찾기 (자동 감지 시도)
     country_list = df['Country'].unique().tolist()
+    # Korea가 포함된 국가명을 찾거나, 없으면 첫 번째 국가 선택
     default_korea = next((c for c in country_list if "Korea" in c), country_list[0])
     
     korea_name = st.selectbox(
@@ -56,8 +57,9 @@ with tab1:
     st.subheader("국가별 MBTI 분포")
     selected_country = st.selectbox("분석할 국가를 선택하세요", country_list)
     
-    # 데이터 전처리: 선택된 국가의 데이터를 'MBTI 유형'과 '수치'로 변환
+    # 데이터 전처리
     country_data = df[df['Country'] == selected_country].iloc[0]
+    # Country 열을 제외한 나머지 컬럼을 MBTI 유형으로 간주
     mbti_cols = [col for col in df.columns if col != 'Country']
     
     # 차트용 데이터프레임 생성
@@ -66,12 +68,12 @@ with tab1:
         'Score': country_data[mbti_cols].values
     })
     
-    # Altair를 이용한 막대 차트 (마우스 오버 시 수치 표시)
+    # Altair 막대 차트
     c = alt.Chart(chart_data).mark_bar().encode(
         x=alt.X('MBTI', sort=None),
         y='Score',
-        color=alt.value('#4c78a8'), # 파란색 계열
-        tooltip=['MBTI', 'Score']   # 마우스 오버 시 정보 표시
+        color=alt.value('#4c78a8'), 
+        tooltip=['MBTI', 'Score']
     ).properties(
         height=400
     )
@@ -92,22 +94,21 @@ with tab2:
     # 한국 데이터 확보
     korea_row = sorted_df[sorted_df['Country'] == korea_name]
     
-    # 시각화용 데이터 합치기 (한국이 Top 10에 없으면 추가)
+    # 시각화용 데이터 합치기 (한국이 Top 10에 없으면 강제로 추가해서 보여줌)
     if not korea_row.empty and korea_name not in top_10['Country'].values:
         plot_df = pd.concat([top_10, korea_row])
     else:
         plot_df = top_10
         
-    # 순위 표시를 위해 Rank 컬럼 추가 (전체 데이터 기준)
+    # 순위 표시를 위해 Rank 컬럼 추가
     sorted_df['Rank'] = range(1, len(sorted_df) + 1)
     plot_df = plot_df.merge(sorted_df[['Country', 'Rank']], on='Country')
     
     # --- Altair 차트 생성 (Highlighting) ---
-    # 기본 막대
     bars = alt.Chart(plot_df).mark_bar().encode(
         x=alt.X(target_mbti, title='Score'),
         y=alt.Y('Country', sort='-x', title='Country'), # 점수 높은 순 정렬
-        # 한국이면 빨간색, 아니면 회색으로 색상 지정
+        # 한국이면 빨간색, 아니면 회색
         color=alt.condition(
             alt.datum.Country == korea_name,
             alt.value('red'),
@@ -120,12 +121,11 @@ with tab2:
     text = bars.mark_text(
         align='left',
         baseline='middle',
-        dx=3  # 막대에서 3픽셀 떨어뜨림
+        dx=3
     ).encode(
         text=target_mbti
     )
     
-    # 차트 결합 및 표시
     final_chart = (bars + text).properties(height=500)
     st.altair_chart(final_chart, use_container_width=True)
     
