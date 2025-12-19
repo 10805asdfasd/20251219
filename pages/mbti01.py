@@ -24,10 +24,9 @@ def load_data():
 
 df = load_data()
 
-# --- 국가명 한글 매핑 (주요 국가 위주) ---
-# 라이브러리 없이 구현하기 위해 주요 국가명을 하드코딩합니다.
-# 여기에 없는 국가는 원래 영문 이름 그대로 출력됩니다.
+# --- 국가명 한글 매핑 (전체 목록 업데이트) ---
 country_map = {
+    # 기존 주요 국가
     "South Korea": "대한민국", "Korea, South": "대한민국", "Korea": "대한민국",
     "United States": "미국", "USA": "미국",
     "Japan": "일본", "China": "중국", "Russia": "러시아",
@@ -45,9 +44,43 @@ country_map = {
     "Egypt": "이집트", "South Africa": "남아공", "Israel": "이스라엘",
     "Iran": "이란", "Iraq": "이라크", "New Zealand": "뉴질랜드",
     "Portugal": "포르투갈", "Greece": "그리스", "Austria": "오스트리아",
-    "Ireland": "아일랜드", "Hungary": "헝가리", "Czech Republic": "체코"
+    "Ireland": "아일랜드", "Hungary": "헝가리", "Czech Republic": "체코",
+    
+    # 추가 요청된 국가들 (가나다 순 정렬)
+    "Albania": "알바니아", "Algeria": "알제리", "Andorra": "안도라",
+    "Antigua and Barbuda": "앤티가 바부다", "Armenia": "아르메니아",
+    "Azerbaijan": "아제르바이잔", "Bahamas": "바하마", "Bahrain": "바레인",
+    "Bangladesh": "방글라데시", "Barbados": "바베이도스", "Belarus": "벨라루스",
+    "Belize": "벨리즈", "Bhutan": "부탄", "Bosnia and Herzegovina": "보스니아 헤르체고비나",
+    "Botswana": "보츠와나", "Brunei": "브루나이", "Bulgaria": "불가리아",
+    "Cambodia": "캄보디아", "Costa Rica": "코스타리카", "Croatia": "크로아티아",
+    "Cyprus": "키프로스", "Dominica": "도미니카 연방",
+    "Dominican Republic": "도미니카 공화국", "Ecuador": "에콰도르",
+    "El Salvador": "엘살바도르", "Estonia": "에스토니아", "Ethiopia": "에티오피아",
+    "Faroe Islands": "페로 제도", "Fiji": "피지", "Georgia": "조지아",
+    "Grenada": "그레나다", "Guatemala": "과테말라", "Guinea": "기니",
+    "Guyana": "가이아나", "Honduras": "온두라스", "Iceland": "아이슬란드",
+    "Jamaica": "자메이카", "Jordan": "요르단", "Kazakhstan": "카자흐스탄",
+    "Kenya": "케냐", "Kuwait": "쿠웨이트", "Kyrgyzstan": "키르기스스탄",
+    "Laos": "라오스", "Latvia": "라트비아", "Lesotho": "레소토",
+    "Libya": "리비아", "Lithuania": "리투아니아", "Luxembourg": "룩셈부르크",
+    "Madagascar": "마다가스카르", "Malawi": "말라위", "Maldives": "몰디브",
+    "Malta": "몰타", "Mauritius": "모리셔스", "Mongolia": "몽골",
+    "Montenegro": "몬테네그로", "Morocco": "모로코", "Myanmar": "미얀마",
+    "Namibia": "나미비아", "Nepal": "네팔", "Macedonia": "마케도니아",
+    "Oman": "오만", "Pakistan": "파키스탄", "Panama": "파나마",
+    "Papua New Guinea": "파푸아뉴기니", "Paraguay": "파라과이", "Qatar": "카타르",
+    "Moldova": "몰도바", "Romania": "루마니아",
+    "Saint Kitts and Nevis": "세인트키츠 네비스", "Saint Lucia": "세인트루시아",
+    "Saint Vincent and the Grenadines": "세인트빈센트 그레나딘",
+    "Senegal": "세네갈", "Serbia": "세르비아", "Seychelles": "세이셸",
+    "Slovakia": "슬로바키아", "Slovenia": "슬로베니아", "Sri Lanka": "스리랑카",
+    "Sudan": "수단", "Suriname": "수리남", "Syria": "시리아",
+    "Tajikistan": "타지키스탄", "Trinidad and Tobago": "트리니다드 토바고",
+    "Tunisia": "튀니지", "United Arab Emirates": "아랍에미리트",
+    "Tanzania": "탄자니아", "Uruguay": "우루과이", "Vanuatu": "바누아투",
+    "Yemen": "예멘", "Zimbabwe": "짐바브웨"
 }
-
 def translate_country(name):
     return country_map.get(name, name) # 매핑에 없으면 원래 이름 반환
 
