@@ -7,11 +7,12 @@ from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 
 # ---------------------------------------------------------
-# 1. 페이지 설정
+# 1. 페이지 설정 (제목 변경 완료)
 # ---------------------------------------------------------
-st.set_page_config(layout="wide", page_title="경기도 안전 와이파이 지도")
+st.set_page_config(layout="wide", page_title="공공와이파이 보안 지도")
 
-st.title("🛡️ 경기도 공공와이파이 보안 지도")
+# 메인 타이틀 변경
+st.title("🛡️ 서울/경기 공공와이파이 보안 지도")
 st.markdown("""
 <style>
     .stRadio > label {font-weight: bold;}
@@ -19,7 +20,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. 데이터 로드 (캐싱 최적화)
+# 2. 데이터 로드 (서울 + 경기 데이터 모두 포함)
 # ---------------------------------------------------------
 @st.cache_data
 def load_data():
@@ -33,8 +34,14 @@ def load_data():
         'WGS84경도': 'lon',
         '설치장소명': 'place_name',
         '설치장소상세': 'detail_address',
-        '서비스제공사명': 'provider'
+        '서비스제공사명': 'provider',
+        '설치시도명': 'city'  # 지역 구분을 위해 추가
     })
+    
+    # [중요] 서울(Secure 데이터 많음)과 경기(기존 데이터)만 필터링
+    # 전국 데이터를 다 쓰면 너무 느리므로 수도권만 남김
+    if 'city' in df.columns:
+        df = df[df['city'].isin(['서울특별시', '경기도'])]
     
     # 결측치 채우기
     df['SSID'] = df['SSID'].fillna('Unknown')
@@ -73,14 +80,17 @@ def get_security_info(ssid, provider):
             
     # Case 2: SSID가 있는 경우
     else:
+        # 안전 (Secure, GiGA 등 암호화)
         if any(x in ssid_lower for x in ['secure', 'giga', 'te']): 
             color = 'green'
             status = "안전 (암호화)"
             score = 3
+        # 주의 (개방형)
         elif any(x in ssid_lower for x in ['free', 'public', 'open', 'guest']):
             color = 'red'
             status = "주의 (개방형)"
             score = 1
+        # 그 외
         else:
             color = 'orange'
             status = "일반 (확인 필요)"
@@ -93,18 +103,20 @@ def get_security_info(ssid, provider):
 # ---------------------------------------------------------
 with st.sidebar.form(key='search_form'):
     st.header("🔍 검색 설정")
-    location_input = st.text_input("장소 입력 (예: 수원역)", value="수원역")
+    # 기본 검색어를 '강남역'으로 변경하여 Secure 데이터를 바로 볼 수 있게 유도
+    location_input = st.text_input("장소 입력 (예: 강남역, 수원역)", value="강남역")
     search_radius = st.slider("검색 반경 (m)", 100, 3000, 500)
     submit_button = st.form_submit_button(label='검색 및 지도 업데이트')
 
-# 기본 좌표 (경기도청)
-location_coords = [37.289, 127.053]
+# 기본 좌표 (서울시청)
+location_coords = [37.5665, 126.9780]
 
 # 검색 버튼을 눌렀을 때만 지오코딩 실행
 if submit_button or location_input:
-    geolocator = Nominatim(user_agent="gyeonggi_wifi_final")
+    geolocator = Nominatim(user_agent="korea_wifi_security_map")
     try:
-        loc = geolocator.geocode(f"경기도 {location_input}")
+        # 검색 정확도를 위해 '대한민국'을 붙여서 검색
+        loc = geolocator.geocode(f"대한민국 {location_input}")
         if loc:
             location_coords = [loc.latitude, loc.longitude]
         else:
@@ -155,7 +167,7 @@ folium.Circle(
     radius=search_radius, color='#3186cc', fill=True, fill_opacity=0.1
 ).add_to(m)
 
-# 마커 클러스터 (줌 아웃 시 뭉쳐 보임)
+# 마커 클러스터
 marker_cluster = MarkerCluster().add_to(m)
 
 for item in nearby_wifi:
@@ -167,11 +179,11 @@ for item in nearby_wifi:
         icon=folium.Icon(color=item['color'], icon='wifi', prefix='fa')
     ).add_to(marker_cluster)
 
-# 지도 출력 (returned_objects=[]로 렉 방지)
+# 지도 출력
 st_folium(m, width="100%", height=500, returned_objects=[])
 
 # ---------------------------------------------------------
-# 7. 결과 테이블 (정렬 및 색상 기능 완벽 수정)
+# 7. 결과 테이블
 # ---------------------------------------------------------
 st.markdown("---")
 
@@ -195,13 +207,12 @@ if nearby_wifi:
     
     cols = ['장소명', '보안상태', 'SSID', '거리(m)', '상세주소', '제공자']
     
-    # [수정됨] 텍스트 색상 로직 (버그 수정 완료)
     def color_coding(val):
         if '안전' in val: 
             return 'color: green; font-weight: bold'
         elif '주의' in val: 
             return 'color: red; font-weight: bold'
-        elif '일반' in val or '보통' in val: # '일반'과 '보통' 모두 처리
+        elif '일반' in val or '보통' in val:
             return 'color: orange; font-weight: bold'
         return 'color: gray'
 
