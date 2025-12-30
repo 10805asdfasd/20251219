@@ -7,12 +7,12 @@ from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 
 # ---------------------------------------------------------
-# 1. 페이지 설정 (제목 변경 완료)
+# 1. 페이지 설정 (서울 전용으로 변경)
 # ---------------------------------------------------------
-st.set_page_config(layout="wide", page_title="공공와이파이 보안 지도")
+st.set_page_config(layout="wide", page_title="서울시 공공와이파이 보안 지도")
 
-# 메인 타이틀 변경
-st.title("🛡️ 서울/경기 공공와이파이 보안 지도")
+# 제목 수정
+st.title("🛡️ 서울특별시 공공와이파이 보안 지도")
 st.markdown("""
 <style>
     .stRadio > label {font-weight: bold;}
@@ -20,11 +20,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 2. 데이터 로드 (서울 + 경기 데이터 모두 포함)
+# 2. 데이터 로드 (서울 데이터만 필터링)
 # ---------------------------------------------------------
 @st.cache_data
 def load_data():
-    # 파일 읽기 (인코딩 utf-8 또는 cp949)
+    # 파일 읽기
     df = pd.read_csv('무료와이파이정보.csv', encoding='utf-8') 
     
     # 컬럼 정리
@@ -35,13 +35,12 @@ def load_data():
         '설치장소명': 'place_name',
         '설치장소상세': 'detail_address',
         '서비스제공사명': 'provider',
-        '설치시도명': 'city'  # 지역 구분을 위해 추가
+        '설치시도명': 'city'  # 지역 필터링용
     })
     
-    # [중요] 서울(Secure 데이터 많음)과 경기(기존 데이터)만 필터링
-    # 전국 데이터를 다 쓰면 너무 느리므로 수도권만 남김
+    # ★ 핵심 수정: 오직 '서울특별시' 데이터만 남김!
     if 'city' in df.columns:
-        df = df[df['city'].isin(['서울특별시', '경기도'])]
+        df = df[df['city'] == '서울특별시']
     
     # 결측치 채우기
     df['SSID'] = df['SSID'].fillna('Unknown')
@@ -70,7 +69,6 @@ def get_security_info(ssid, provider):
     # Case 1: SSID가 없는 경우
     if ssid == 'Unknown' or ssid == '':
         color = 'gray'
-        # 메이저 통신사 추정
         if any(x in provider_lower for x in ['kt', 'skt', 'lgu+', 'u+']):
             status = "정보 없음 (추정: 보통)"
             score = 2
@@ -80,7 +78,7 @@ def get_security_info(ssid, provider):
             
     # Case 2: SSID가 있는 경우
     else:
-        # 안전 (Secure, GiGA 등 암호화)
+        # 안전 (SEOUL_Secure 등)
         if any(x in ssid_lower for x in ['secure', 'giga', 'te']): 
             color = 'green'
             status = "안전 (암호화)"
@@ -102,25 +100,24 @@ def get_security_info(ssid, provider):
 # 4. 사이드바 (검색 설정)
 # ---------------------------------------------------------
 with st.sidebar.form(key='search_form'):
-    st.header("🔍 검색 설정")
-    # 기본 검색어를 '강남역'으로 변경하여 Secure 데이터를 바로 볼 수 있게 유도
-    location_input = st.text_input("장소 입력 (예: 강남역, 수원역)", value="강남역")
+    st.header("🔍 서울 지역 검색")
+    # 서울의 대표적인 장소로 기본값 변경
+    location_input = st.text_input("장소 입력 (예: 강남역, 홍대입구)", value="서울시청")
     search_radius = st.slider("검색 반경 (m)", 100, 3000, 500)
     submit_button = st.form_submit_button(label='검색 및 지도 업데이트')
 
 # 기본 좌표 (서울시청)
 location_coords = [37.5665, 126.9780]
 
-# 검색 버튼을 눌렀을 때만 지오코딩 실행
 if submit_button or location_input:
-    geolocator = Nominatim(user_agent="korea_wifi_security_map")
+    geolocator = Nominatim(user_agent="seoul_wifi_map")
     try:
-        # 검색 정확도를 위해 '대한민국'을 붙여서 검색
-        loc = geolocator.geocode(f"대한민국 {location_input}")
+        # 서울 지역 위주로 검색되도록 수정
+        loc = geolocator.geocode(f"서울 {location_input}")
         if loc:
             location_coords = [loc.latitude, loc.longitude]
         else:
-            st.sidebar.warning("장소를 찾을 수 없어 기본 위치로 이동합니다.")
+            st.sidebar.warning("장소를 찾을 수 없어 서울시청으로 이동합니다.")
     except:
         pass
 
@@ -171,7 +168,6 @@ folium.Circle(
 marker_cluster = MarkerCluster().add_to(m)
 
 for item in nearby_wifi:
-    # 지도 아이콘 색깔 적용
     folium.Marker(
         location=[item['lat'], item['lon']],
         popup=folium.Popup(f"<b>{item['장소명']}</b><br>SSID: {item['SSID']}<br>상태: {item['보안상태']}", max_width=300),
@@ -199,7 +195,6 @@ if nearby_wifi:
             ("안전도 우선 (추천)", "거리 우선")
         )
 
-    # 정렬 로직
     if sort_option == "안전도 우선 (추천)":
         df_res = df_res.sort_values(by=['점수', '거리(m)'], ascending=[False, True])
     else:
@@ -223,4 +218,4 @@ if nearby_wifi:
         hide_index=True
     )
 else:
-    st.info("설정된 범위 내에 와이파이가 없습니다.")
+    st.info("설정된 범위 내에 서울시 공공와이파이가 없습니다.")
