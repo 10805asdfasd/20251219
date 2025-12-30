@@ -163,25 +163,54 @@ for item in nearby_wifi:
 st_folium(m, width="100%", height=500, returned_objects=[])
 
 # ---------------------------------------------------------
-# 7. 결과 테이블
+# 7. 결과 테이블 (정렬 기능 추가됨)
 # ---------------------------------------------------------
 st.markdown("---")
+
 if nearby_wifi:
     st.subheader(f"📍 검색 결과: {len(nearby_wifi)}개 발견")
     
+    # 리스트를 데이터프레임으로 변환
     df_res = pd.DataFrame(nearby_wifi)
-    df_res = df_res.sort_values(by=['점수', '거리(m)'], ascending=[False, True])
     
-    cols = ['장소명', '보안상태', 'SSID', '거리(m)', '상세주소']
-    
-    def color_coding(val):
-        if '안전' in val: return 'color: green; font-weight: bold'
-        if '주의' in val: return 'color: red; font-weight: bold'
-        return 'color: gray'
+    # [정렬 UI] 라디오 버튼으로 정렬 기준 선택
+    col1, col2 = st.columns([1, 3]) # 디자인을 위해 컬럼 분할
+    with col1:
+        sort_option = st.radio(
+            "📋 정렬 기준 선택:",
+            ("안전도 우선 (추천)", "거리 우선"),
+            help="안전도 우선: 보안 점수가 높은 순서대로 정렬합니다.\n거리 우선: 현재 위치에서 가까운 순서대로 정렬합니다."
+        )
 
+    # [정렬 로직]
+    if sort_option == "안전도 우선 (추천)":
+        # 1순위: 점수(높은게 위로), 2순위: 거리(가까운게 위로)
+        df_res = df_res.sort_values(by=['점수', '거리(m)'], ascending=[False, True])
+    else:
+        # 거리(가까운게 위로)
+        df_res = df_res.sort_values(by='거리(m)', ascending=True)
+    
+    # 보여줄 컬럼 정의
+    cols = ['장소명', '보안상태', 'SSID', '거리(m)', '상세주소', '제공자']
+    
+    # [스타일링] 보안 상태에 따라 글자색 변경
+    def color_coding(val):
+        if '안전' in val: 
+            return 'color: green; font-weight: bold'
+        elif '주의' in val: 
+            return 'color: red; font-weight: bold'
+        elif '보통' in val:
+            return 'color: orange; font-weight: bold'
+        return 'color: gray' # 정보 없음 등
+
+    # 테이블 출력 (use_container_width=True로 가로 꽉 차게)
     st.dataframe(
-        df_res[cols].style.applymap(color_coding, subset=['보안상태']),
-        use_container_width=True
+        df_res[cols].style.applymap(color_coding, subset=['보안상태'])
+                          .format({'거리(m)': '{:.1f}m'}), # 거리 소수점 예쁘게 표시
+        use_container_width=True,
+        hide_index=True # 0, 1, 2... 인덱스 번호 숨기기 (깔끔함)
     )
+
 else:
-    st.info("설정된 범위 내에 와이파이가 없습니다.")
+    # 검색 결과가 없을 때
+    st.info("설정된 범위 내에 와이파이가 없습니다. 검색 반경을 넓히거나 다른 장소를 입력해보세요.")
