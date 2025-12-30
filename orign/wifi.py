@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-from folium.plugins import MarkerCluster, FastMarkerCluster
+from folium.plugins import MarkerCluster
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 
@@ -12,15 +12,21 @@ from geopy.distance import geodesic
 st.set_page_config(layout="wide", page_title="경기도 안전 와이파이 지도")
 
 st.title("🛡️ 경기도 공공와이파이 보안 지도")
+st.markdown("""
+<style>
+    .stRadio > label {font-weight: bold;}
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------
 # 2. 데이터 로드 (캐싱 최적화)
 # ---------------------------------------------------------
 @st.cache_data
 def load_data():
-    # encoding은 상황에 따라 'cp949' 또는 'utf-8'
+    # 파일 읽기 (인코딩 utf-8 또는 cp949)
     df = pd.read_csv('무료와이파이정보.csv', encoding='utf-8') 
     
+    # 컬럼 정리
     df = df.rename(columns={
         '와이파이SSID': 'SSID',
         'WGS84위도': 'lat',
@@ -30,10 +36,11 @@ def load_data():
         '서비스제공사명': 'provider'
     })
     
+    # 결측치 채우기
     df['SSID'] = df['SSID'].fillna('Unknown')
     df['provider'] = df['provider'].fillna('Unknown')
     
-    # 좌표 변환 및 결측치 제거
+    # 좌표 숫자 변환
     df['lat'] = pd.to_numeric(df['lat'], errors='coerce')
     df['lon'] = pd.to_numeric(df['lon'], errors='coerce')
     df = df.dropna(subset=['lat', 'lon'])
@@ -47,20 +54,24 @@ except Exception as e:
     st.stop()
 
 # ---------------------------------------------------------
-# 3. 보안 분석 함수
+# 3. 보안 분석 로직
 # ---------------------------------------------------------
 def get_security_info(ssid, provider):
     ssid_lower = str(ssid).lower()
     provider_lower = str(provider).lower()
     
+    # Case 1: SSID가 없는 경우
     if ssid == 'Unknown' or ssid == '':
         color = 'gray'
+        # 메이저 통신사 추정
         if any(x in provider_lower for x in ['kt', 'skt', 'lgu+', 'u+']):
             status = "정보 없음 (추정: 보통)"
             score = 2
         else:
             status = "정보 없음 (추정: 낮음)"
             score = 0
+            
+    # Case 2: SSID가 있는 경우
     else:
         if any(x in ssid_lower for x in ['secure', 'giga', 'te']): 
             color = 'green'
@@ -74,45 +85,41 @@ def get_security_info(ssid, provider):
             color = 'orange'
             status = "일반 (확인 필요)"
             score = 2
+            
     return color, status, score
 
 # ---------------------------------------------------------
-# 4. 사이드바 (Form 사용으로 깜빡임 방지)
+# 4. 사이드바 (검색 설정)
 # ---------------------------------------------------------
 with st.sidebar.form(key='search_form'):
     st.header("🔍 검색 설정")
     location_input = st.text_input("장소 입력 (예: 수원역)", value="수원역")
     search_radius = st.slider("검색 반경 (m)", 100, 3000, 500)
-    
-    # 이 버튼을 눌러야만 지도가 갱신됩니다! (속도 향상 핵심)
     submit_button = st.form_submit_button(label='검색 및 지도 업데이트')
 
-# 초기 좌표 (경기도청)
+# 기본 좌표 (경기도청)
 location_coords = [37.289, 127.053]
 
+# 검색 버튼을 눌렀을 때만 지오코딩 실행
 if submit_button or location_input:
-    geolocator = Nominatim(user_agent="gyeonggi_wifi_fast")
+    geolocator = Nominatim(user_agent="gyeonggi_wifi_final")
     try:
         loc = geolocator.geocode(f"경기도 {location_input}")
         if loc:
             location_coords = [loc.latitude, loc.longitude]
         else:
-            st.sidebar.warning("장소를 못 찾아서 기본 위치로 이동합니다.")
+            st.sidebar.warning("장소를 찾을 수 없어 기본 위치로 이동합니다.")
     except:
         pass
 
 # ---------------------------------------------------------
-# 5. 지도 데이터 필터링 (속도 개선된 로직)
+# 5. 데이터 필터링 (속도 최적화)
 # ---------------------------------------------------------
-# iterrows() 대신 리스트 컴프리헨션 사용 (속도 10배 향상)
 nearby_wifi = []
-
-# 계산을 위해 필요한 데이터만 numpy나 list로 변환하여 순회
 rows = zip(df['lat'], df['lon'], df['SSID'], df['provider'], df['place_name'], df['detail_address'])
 
 for lat, lon, ssid, provider, place, detail in rows:
     wifi_loc = (lat, lon)
-    # 거리 계산
     distance = geodesic(location_coords, wifi_loc).meters
     
     if distance <= search_radius:
@@ -135,82 +142,74 @@ for lat, lon, ssid, provider, place, detail in rows:
 # ---------------------------------------------------------
 m = folium.Map(location=location_coords, zoom_start=15)
 
-# 현재 위치 표시
+# 내 위치 표시
 folium.Marker(
     location=location_coords,
     popup="검색 위치",
     icon=folium.Icon(color='blue', icon='user', prefix='fa')
 ).add_to(m)
 
+# 반경 표시
 folium.Circle(
     location=location_coords,
     radius=search_radius, color='#3186cc', fill=True, fill_opacity=0.1
 ).add_to(m)
 
-# 마커 클러스터 추가
+# 마커 클러스터 (줌 아웃 시 뭉쳐 보임)
 marker_cluster = MarkerCluster().add_to(m)
 
-# 필터링된 데이터만 마커 생성
 for item in nearby_wifi:
+    # 지도 아이콘 색깔 적용
     folium.Marker(
         location=[item['lat'], item['lon']],
-        popup=folium.Popup(f"<b>{item['장소명']}</b><br>{item['SSID']}<br>{item['보안상태']}", max_width=300),
+        popup=folium.Popup(f"<b>{item['장소명']}</b><br>SSID: {item['SSID']}<br>상태: {item['보안상태']}", max_width=300),
+        tooltip=f"{item['장소명']} ({item['보안상태']})",
         icon=folium.Icon(color=item['color'], icon='wifi', prefix='fa')
     ).add_to(marker_cluster)
 
-# ★★★ 핵심 최적화: returned_objects=[] ★★★
-# 지도를 움직여도 데이터를 다시 받아오지 않게 설정하여 렉을 줄임
+# 지도 출력 (returned_objects=[]로 렉 방지)
 st_folium(m, width="100%", height=500, returned_objects=[])
 
 # ---------------------------------------------------------
-# 7. 결과 테이블 (정렬 기능 추가됨)
+# 7. 결과 테이블 (정렬 및 색상 기능 완벽 수정)
 # ---------------------------------------------------------
 st.markdown("---")
 
 if nearby_wifi:
     st.subheader(f"📍 검색 결과: {len(nearby_wifi)}개 발견")
     
-    # 리스트를 데이터프레임으로 변환
     df_res = pd.DataFrame(nearby_wifi)
     
-    # [정렬 UI] 라디오 버튼으로 정렬 기준 선택
-    col1, col2 = st.columns([1, 3]) # 디자인을 위해 컬럼 분할
+    col1, col2 = st.columns([1, 3])
     with col1:
         sort_option = st.radio(
-            "📋 정렬 기준 선택:",
-            ("안전도 우선 (추천)", "거리 우선"),
-            help="안전도 우선: 보안 점수가 높은 순서대로 정렬합니다.\n거리 우선: 현재 위치에서 가까운 순서대로 정렬합니다."
+            "📋 정렬 기준:",
+            ("안전도 우선 (추천)", "거리 우선")
         )
 
-    # [정렬 로직]
+    # 정렬 로직
     if sort_option == "안전도 우선 (추천)":
-        # 1순위: 점수(높은게 위로), 2순위: 거리(가까운게 위로)
         df_res = df_res.sort_values(by=['점수', '거리(m)'], ascending=[False, True])
     else:
-        # 거리(가까운게 위로)
         df_res = df_res.sort_values(by='거리(m)', ascending=True)
     
-    # 보여줄 컬럼 정의
     cols = ['장소명', '보안상태', 'SSID', '거리(m)', '상세주소', '제공자']
     
-    # [스타일링] 보안 상태에 따라 글자색 변경
+    # [수정됨] 텍스트 색상 로직 (버그 수정 완료)
     def color_coding(val):
         if '안전' in val: 
             return 'color: green; font-weight: bold'
         elif '주의' in val: 
             return 'color: red; font-weight: bold'
-        elif '보통' in val:
+        elif '일반' in val or '보통' in val: # '일반'과 '보통' 모두 처리
             return 'color: orange; font-weight: bold'
-        return 'color: gray' # 정보 없음 등
+        return 'color: gray'
 
-    # 테이블 출력 (use_container_width=True로 가로 꽉 차게)
     st.dataframe(
         df_res[cols].style.applymap(color_coding, subset=['보안상태'])
-                          .format({'거리(m)': '{:.1f}m'}), # 거리 소수점 예쁘게 표시
+                          .format({'거리(m)': '{:.1f}m'}),
         use_container_width=True,
-        hide_index=True # 0, 1, 2... 인덱스 번호 숨기기 (깔끔함)
+        hide_index=True
     )
-
 else:
-    # 검색 결과가 없을 때
-    st.info("설정된 범위 내에 와이파이가 없습니다. 검색 반경을 넓히거나 다른 장소를 입력해보세요.")
+    st.info("설정된 범위 내에 와이파이가 없습니다.")
