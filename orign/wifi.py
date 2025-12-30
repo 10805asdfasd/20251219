@@ -27,7 +27,7 @@ st.markdown("""
 def load_data():
     # ★ 수정된 부분: 파일명을 '무료와이파이정보.csv'로 변경했습니다.
     # 인코딩은 보통 cp949이나, 에러가 나면 'utf-8'로 바꿔보세요.
-    df = pd.read_csv('무료와이파이정보.csv', encoding='cp949') 
+    df = pd.read_csv('무료와이파이정보.csv', encoding='utf-8') 
     
     # 컬럼 이름 정리
     df = df.rename(columns={
